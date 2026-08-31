@@ -1,6 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 
-import { buildPrompt, SYSTEM_PROMPT } from "./prompts";
+import { buildPromptPayload, buildSystemInstruction } from "./prompts";
 import type {
   ChatMessage,
   GenerateResponseInput,
@@ -8,7 +8,7 @@ import type {
   HotelContext,
 } from "./types";
 
-const DEFAULT_MODEL = "gemini-2.5-flash";
+const DEFAULT_MODEL = "gemini-2.0-flash";
 
 const formatHotelContext = (hotelContext: HotelContext): string => {
   const rooms = hotelContext.rooms
@@ -31,14 +31,29 @@ const formatHotelContext = (hotelContext: HotelContext): string => {
   return `Hotel: ${hotelContext.hotel.name}\nAddress: ${hotelContext.hotel.address}\nPhone: ${hotelContext.hotel.phone}\nEmail: ${hotelContext.hotel.email}\n\nRooms:\n${rooms}\n\nFacilities:\n${facilities || "- Not provided"}\n\nPolicies:\n${policies || "- Not provided"}\n\nFAQs:\n${faqs || "- Not provided"}`;
 };
 
-const buildConversationHistory = (messages: ChatMessage[]): string => {
+const buildConversationMessages = (messages: ChatMessage[], userMessage: string) => {
   if (!messages.length) {
-    return "No prior messages.";
+    return [{
+      role: "user" as const,
+      parts: [{ text: buildPromptPayload("the hotel", "No hotel data provided.", userMessage) }],
+    }];
   }
 
-  return messages
+  const historyText = messages
+    .filter((message) => message.role !== "system")
     .map((message) => `${message.role.toUpperCase()}: ${message.content}`)
     .join("\n");
+
+  return [{
+    role: "user" as const,
+    parts: [{
+      text: buildPromptPayload(
+        "the hotel",
+        "No hotel data provided.",
+        `Conversation history:\n${historyText}\n\nCurrent guest question:\n${userMessage}`,
+      ),
+    }],
+  }];
 };
 
 const inferHandoff = (text: string): boolean => {
@@ -64,25 +79,41 @@ export async function generateAIResponse(
     };
   }
 
-  const ai = new GoogleGenAI({ apiKey });
-  const prompt = buildPrompt(
-    {
-      hotel: input.hotelContext.hotel,
-      rooms: input.hotelContext.rooms,
-      facilities: input.hotelContext.facilities,
-      policies: input.hotelContext.policies,
-      faqs: input.hotelContext.faqs,
+  const hotelContextText =
+    typeof input.hotelContext === "string"
+      ? input.hotelContext
+      : formatHotelContext(input.hotelContext);
+
+  const hotelName = input.hotelName ||
+    (typeof input.hotelContext === "string" ? "the hotel" : input.hotelContext.hotel.name);
+
+  const ai = new GoogleGenAI({
+    apiKey,
+    httpOptions: {
+      baseUrl: "https://generativelanguage.googleapis.com",
     },
-    buildConversationHistory(input.messages),
-    input.userMessage,
-  );
+  });
 
   try {
+    const promptText = buildPromptPayload(
+      hotelName,
+      hotelContextText,
+      input.messages.length
+        ? `Conversation history:\n${input.messages
+            .filter((message) => message.role !== "system")
+            .map((message) => `${message.role.toUpperCase()}: ${message.content}`)
+            .join("\n")}\n\nCurrent guest question:\n${input.userMessage}`
+        : input.userMessage,
+    );
+
+    console.log("=== DEBUG: PROMPT LENGTH ===", promptText.length);
+    console.log("=== DEBUG: MODEL ===", model);
+
     const response = await ai.models.generateContent({
       model,
       contents: [{
         role: "user",
-        parts: [{ text: prompt }],
+        parts: [{ text: promptText }],
       }],
     });
 
@@ -93,6 +124,13 @@ export async function generateAIResponse(
       suggestedHandoff: inferHandoff(text),
     };
   } catch (error) {
+    console.error("Gemini API call failed:", error);
+    if (error instanceof Error) {
+      console.error("Error message:", error.message);
+      console.error("Error stack:", error.stack);
+    }
+    console.error("Error details:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+
     const fallbackMessage =
       "I can only answer using the hotel information provided. If you need a booking or staff assistance, please contact the front desk directly.";
 
@@ -103,5 +141,5 @@ export async function generateAIResponse(
   }
 }
 
-export { SYSTEM_PROMPT, formatHotelContext };
+export { buildPromptPayload, buildSystemInstruction, formatHotelContext };
 export default generateAIResponse;
