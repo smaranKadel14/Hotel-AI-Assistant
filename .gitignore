@@ -15,3 +15,8 @@ coverage/
 Thumbs.db
 
 tsconfig.tsbuildinfo
+
+.agents/
+.claude/
+.cursor/
+.devin/
