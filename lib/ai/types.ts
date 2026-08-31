@@ -39,7 +39,8 @@ export interface ChatMessage {
 }
 
 export interface GenerateResponseInput {
-  hotelContext: HotelContext;
+  hotelContext: HotelContext | string;
+  hotelName?: string;
   messages: ChatMessage[];
   userMessage: string;
   apiKey?: string;

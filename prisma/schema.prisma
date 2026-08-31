@@ -7,39 +7,33 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Sender {
-  GUEST
-  AI
-  STAFF
-}
-
 model Hotel {
-  id                String            @id @default(cuid())
-  name              String
-  slug              String            @unique
-  address           String
-  phone             String
-  email             String
-  rooms             Room[]
-  facilities        Facility[]
-  policies          Policy[]
-  faqs              Faq[]
-  conversations     Conversation[]
-  bookingInquiries  BookingInquiry[]
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
+  id               String           @id @default(cuid())
+  name             String
+  slug             String           @unique
+  address          String
+  phone            String
+  email            String
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  bookingInquiries BookingInquiry[]
+  conversations    Conversation[]
+  facilities       Facility[]
+  faqs             Faq[]
+  policies         Policy[]
+  rooms            Room[]
 }
 
 model Room {
   id          String   @id @default(cuid())
   hotelId     String
-  hotel       Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
   name        String
   description String
   priceNpr    Float
   capacity    Int
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  hotel       Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
 
   @@index([hotelId])
 }
@@ -47,11 +41,11 @@ model Room {
 model Facility {
   id        String   @id @default(cuid())
   hotelId   String
-  hotel     Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
   name      String
   category  String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  hotel     Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
 
   @@index([hotelId])
 }
@@ -59,11 +53,11 @@ model Facility {
 model Policy {
   id        String   @id @default(cuid())
   hotelId   String
-  hotel     Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
   title     String
   content   String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  hotel     Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
 
   @@index([hotelId])
 }
@@ -71,25 +65,25 @@ model Policy {
 model Faq {
   id        String   @id @default(cuid())
   hotelId   String
-  hotel     Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
   question  String
   answer    String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  hotel     Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
 
   @@index([hotelId])
 }
 
 model Conversation {
-  id               String          @id @default(cuid())
+  id               String           @id @default(cuid())
   hotelId          String
-  hotel            Hotel           @relation(fields: [hotelId], references: [id], onDelete: Cascade)
-  channel          String          @default("WEB")
+  channel          String           @default("WEB")
   guestName        String?
-  messages         Message[]
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
   bookingInquiries BookingInquiry[]
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
+  hotel            Hotel            @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  messages         Message[]
 
   @@index([hotelId])
 }
@@ -97,29 +91,35 @@ model Conversation {
 model Message {
   id             String       @id @default(cuid())
   conversationId String
-  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   sender         Sender
   text           String
   createdAt      DateTime     @default(now())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
   @@index([conversationId])
 }
 
 model BookingInquiry {
-  id             String       @id @default(cuid())
+  id             String        @id @default(cuid())
   hotelId        String
-  hotel          Hotel        @relation(fields: [hotelId], references: [id], onDelete: Cascade)
   conversationId String?
-  conversation  Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
   guestName      String
   guestEmail     String
   guestPhone     String
   roomType       String?
   checkIn        DateTime?
   checkOut       DateTime?
-  status         String       @default("PENDING")
-  createdAt      DateTime     @default(now())
+  status         String        @default("PENDING")
+  createdAt      DateTime      @default(now())
+  conversation   Conversation? @relation(fields: [conversationId], references: [id])
+  hotel          Hotel         @relation(fields: [hotelId], references: [id], onDelete: Cascade)
 
   @@index([hotelId])
   @@index([conversationId])
+}
+
+enum Sender {
+  GUEST
+  AI
+  STAFF
 }
