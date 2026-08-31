@@ -8,7 +8,7 @@ import type {
   HotelContext,
 } from "./types";
 
-const DEFAULT_MODEL = "gemini-2.0-flash";
+const DEFAULT_MODEL = "gemini-3.6-flash";
 
 const formatHotelContext = (hotelContext: HotelContext): string => {
   const rooms = hotelContext.rooms
