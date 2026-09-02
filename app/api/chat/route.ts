@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { formatHotelContext, generateAIResponse } from "@/lib/ai/provider";
+import { processBookingInquiry } from "@/lib/booking/inquiry";
 import { prisma } from "@/lib/prisma";
 
 type ChatRequestBody = {
@@ -136,11 +137,33 @@ export async function POST(request: Request) {
       userMessage: guestMessage.text,
     });
 
+    let finalReply = aiResponse.text;
+    let bookingInquiryCaptured = false;
+
+    const buildBookingInquiryReply = () =>
+      "Thanks! I’ve recorded your booking inquiry and sent the details to our staff. They will confirm availability and get back to you.";
+
+    try {
+      const inquiryState = await processBookingInquiry({
+        hotelId: hotel.id,
+        conversationId: conversation.id,
+        extraction: aiResponse.bookingExtraction,
+      });
+
+      bookingInquiryCaptured = inquiryState.bookingInquiryCaptured;
+
+      if (bookingInquiryCaptured) {
+        finalReply = buildBookingInquiryReply();
+      }
+    } catch (error) {
+      console.error("Booking inquiry processing failed:", error);
+    }
+
     const savedAiMessage = await prisma.message.create({
       data: {
         conversationId: conversation.id,
         sender: "AI",
-        text: aiResponse.text,
+        text: finalReply,
       },
     });
 
@@ -148,6 +171,7 @@ export async function POST(request: Request) {
       conversationId: conversation.id,
       reply: savedAiMessage.text,
       handoffSuggested: aiResponse.suggestedHandoff,
+      bookingInquiryCaptured,
     });
   } catch (error) {
     console.error("Chat route error:", error);

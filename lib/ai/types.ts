@@ -38,6 +38,16 @@ export interface ChatMessage {
   content: string;
 }
 
+export interface BookingExtraction {
+  bookingIntent: boolean;
+  guestName: string | null;
+  guestEmail: string | null;
+  guestPhone: string | null;
+  roomType: string | null;
+  checkIn: string | null;
+  checkOut: string | null;
+}
+
 export interface GenerateResponseInput {
   hotelContext: HotelContext | string;
   hotelName?: string;
@@ -50,4 +60,5 @@ export interface GenerateResponseInput {
 export interface GenerateResponseOutput {
   text: string;
   suggestedHandoff: boolean;
+  bookingExtraction?: BookingExtraction | null;
 }

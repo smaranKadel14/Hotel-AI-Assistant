@@ -2,6 +2,7 @@ import { GoogleGenAI } from "@google/genai";
 
 import { buildPromptPayload, buildSystemInstruction } from "./prompts";
 import type {
+  BookingExtraction,
   ChatMessage,
   GenerateResponseInput,
   GenerateResponseOutput,
@@ -63,6 +64,59 @@ const inferHandoff = (text: string): boolean => {
   return handoffPattern.test(text) || text.trim().length === 0;
 };
 
+const parseBookingExtraction = (rawText: string): BookingExtraction | null => {
+  let text = rawText.trim();
+
+  if (!text) {
+    return null;
+  }
+
+  const fencedMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  if (fencedMatch?.[1]) {
+    text = fencedMatch[1].trim();
+  }
+
+  const jsonStart = text.indexOf("{");
+  const jsonEnd = text.lastIndexOf("}");
+  if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
+    text = text.slice(jsonStart, jsonEnd + 1);
+  }
+
+  try {
+    const parsed = JSON.parse(text) as Partial<BookingExtraction> | null;
+    if (!parsed || typeof parsed !== "object") {
+      return null;
+    }
+
+    return {
+      bookingIntent: Boolean(parsed.bookingIntent),
+      guestName: typeof parsed.guestName === "string" ? parsed.guestName.trim() || null : null,
+      guestEmail: typeof parsed.guestEmail === "string" ? parsed.guestEmail.trim() || null : null,
+      guestPhone: typeof parsed.guestPhone === "string" ? parsed.guestPhone.trim() || null : null,
+      roomType: typeof parsed.roomType === "string" ? parsed.roomType.trim() || null : null,
+      checkIn: typeof parsed.checkIn === "string" ? parsed.checkIn.trim() || null : null,
+      checkOut: typeof parsed.checkOut === "string" ? parsed.checkOut.trim() || null : null,
+    };
+  } catch (error) {
+    console.warn("Failed to parse booking extraction from Gemini response:", error);
+    return null;
+  }
+};
+
+const parseGeminiReply = (responseText: string) => {
+  const normalized = responseText.trim();
+  const textMatch = normalized.match(/TEXT:\s*([\s\S]*?)(?:\n\s*BOOKING_EXTRACTION\s*:\s*|$)/i);
+  const extractionMatch = normalized.match(/BOOKING_EXTRACTION\s*:\s*([\s\S]*)$/i);
+
+  const plainText = textMatch?.[1]?.trim() || normalized;
+  const extractionText = extractionMatch?.[1]?.trim() || "";
+
+  return {
+    text: plainText,
+    extraction: extractionText ? parseBookingExtraction(extractionText) : null,
+  };
+};
+
 export async function generateAIResponse(
   input: GenerateResponseInput,
 ): Promise<GenerateResponseOutput> {
@@ -104,7 +158,7 @@ export async function generateAIResponse(
             .map((message) => `${message.role.toUpperCase()}: ${message.content}`)
             .join("\n")}\n\nCurrent guest question:\n${input.userMessage}`
         : input.userMessage,
-    );
+    ) + `\n\nYou must respond in exactly this format:\nTEXT:\n<plain, guest-facing reply to the guest>\nBOOKING_EXTRACTION:\n{ "bookingIntent": boolean, "guestName": string|null, "guestEmail": string|null, "guestPhone": string|null, "roomType": string|null, "checkIn": string|null, "checkOut": string|null }\n\nRules:\n- The TEXT portion must be a natural customer-facing reply.\n- The TEXT must never say a reservation is confirmed or guaranteed.\n- Use “booking inquiry” wording consistently when discussing an inquiry.\n- If booking details are being collected, clearly say that staff must confirm availability.\n- The BOOKING_EXTRACTION portion must be valid JSON only and must not include markdown or code fences.\n- Only include values the guest actually provided or that can be safely inferred from the conversation.\n- If a value is unknown, use null.\n- Do not invent room prices, dates, or bookings.\n- Only use the hotel knowledge base for room details and prices; do not invent pricing.`;
 
     console.log("=== DEBUG: PROMPT LENGTH ===", promptText.length);
     console.log("=== DEBUG: MODEL ===", model);
@@ -117,11 +171,14 @@ export async function generateAIResponse(
       }],
     });
 
-    const text = response.text?.trim() || "I can only answer from the hotel information provided. Please contact the front desk for anything beyond that.";
+    const rawText = response.text?.trim() || "I can only answer from the hotel information provided. Please contact the front desk for anything beyond that.";
+    const parsedReply = parseGeminiReply(rawText);
+    const text = parsedReply.text || rawText;
 
     return {
       text,
       suggestedHandoff: inferHandoff(text),
+      bookingExtraction: parsedReply.extraction,
     };
   } catch (error) {
     console.error("Gemini API call failed:", error);
