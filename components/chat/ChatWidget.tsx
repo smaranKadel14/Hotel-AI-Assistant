@@ -127,7 +127,7 @@ export function ChatWidget({
     <div className="fixed bottom-5 right-5 z-50 flex flex-col items-end">
       {/* Chat Window */}
       {isOpen && (
-        <div className="mb-3 flex h-[520px] w-[360px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl transition-all sm:w-[400px]">
+        <div className="mb-3 flex h-130 w-90 max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl transition-all sm:w-100">
           {/* Header */}
           <div className="flex items-center justify-between bg-slate-900 px-4 py-3.5 text-white">
             <div className="flex items-center space-x-3">
