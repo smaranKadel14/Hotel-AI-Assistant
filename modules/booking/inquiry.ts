@@ -1,6 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 
-import type { BookingExtraction } from "@/lib/ai/types";
+import type { BookingExtraction } from "@/modules/ai/types";
 import { prisma } from "@/lib/prisma";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

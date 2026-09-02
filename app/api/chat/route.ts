@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { formatHotelContext, generateAIResponse } from "@/lib/ai/provider";
-import { processBookingInquiry } from "@/lib/booking/inquiry";
+import { formatHotelContext, generateAIResponse } from "@/modules/ai/provider";
+import { processBookingInquiry } from "@/modules/booking/inquiry";
 import { prisma } from "@/lib/prisma";
 
 type ChatRequestBody = {

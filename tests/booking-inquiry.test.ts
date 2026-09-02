@@ -5,7 +5,7 @@ import {
   normalizeBookingExtraction,
   parseSafeDateString,
   processBookingInquiry,
-} from "@/lib/booking/inquiry";
+} from "@/modules/booking/inquiry";
 
 const makeMockPrisma = () => {
   const state = {
